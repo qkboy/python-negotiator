@@ -36,7 +36,6 @@ __version__ = '0.8.4'
 # Initialize a logger for this module.
 logger = logging.getLogger(__name__)
 
-
 class HostDaemon(object):
 
     """The host daemon automatically manages a group of processes that handle "guest to host" calls."""
@@ -153,12 +152,17 @@ class GuestChannel(NegotiatorInterface):
             # naming convention is used on 12.04 and 14.04.
             new_style = os.path.join(CHANNELS_DIRECTORY, 'domain-%s' % self.guest_name, HOST_TO_GUEST_CHANNEL_NAME)
             old_style = os.path.join(CHANNELS_DIRECTORY, '%s.%s' % (self.guest_name, HOST_TO_GUEST_CHANNEL_NAME))
+            # The new naming in CentOS 7.3 with libvirt 2.0.0.
+            third_style = os.path.join(CHANNELS_DIRECTORY, 'domain-%s-%s' % ( find_running_vm_id(self.guest_name), self.guest_name ), HOST_TO_GUEST_CHANNEL_NAME)
             if os.path.exists(new_style):
                 logger.debug("Found channel of guest %r (using new naming convention).", self.guest_name)
                 unix_socket = new_style
             elif os.path.exists(old_style):
                 logger.debug("Found channel of guest %r (using old naming convention).", self.guest_name)
                 unix_socket = old_style
+            elif os.path.exists(third_style):
+                logger.debug("Found channel of guest %r (using third naming convention).", self.guest_name)
+                unix_socket = third_style
             else:
                 msg = "No UNIX socket pathname provided and auto-detection failed!"
                 raise GuestChannelInitializationError(msg)
@@ -224,7 +228,10 @@ def find_available_channels(directory, name):
                 # following directory/file naming scheme for channels:
                 #
                 # /var/lib/libvirt/qemu/channel/target/domain-GUEST_NAME/negotiator-guest-to-host.0
-                guest_name = re.sub('^domain-', '', os.path.basename(root))
+                # Centos 7.3 with libvirt 2.0.0 now assume the
+                # directory/file naming scheme for channels:
+                # /var/lib/libvirt/qemu/channel/target/domain-DOMAIN_ID-GUEST_NAME/negotiator-guest-to-host.0
+                guest_name = re.sub('^domain-(\d+)?-?', '', os.path.basename(root))
                 logger.debug("Found channel of guest %r (using new naming convention).", guest_name)
             else:
                 continue
@@ -266,3 +273,13 @@ def find_running_guests():
                 yield vm_name
         except Exception:
             logger.warning("Failed to parse 'virsh list' output! (%r)", line)
+
+def find_running_vm_id(name):
+    logger.debug("Discovering running guest id using 'virsh domid' command ..")
+    try:
+        vm_id = execute('virsh --quiet domid %s' % name, capture=True, logger=logger)
+        logger.debug("Get vm '%s' domain id %s" % (name, vm_id))
+        return vm_id
+    except Exception:
+        logger.warning("Failed to execute 'virsh domid %r' output!", name)
+
