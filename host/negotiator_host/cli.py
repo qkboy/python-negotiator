@@ -39,7 +39,11 @@ Supported options:
 
   -v, --verbose
 
-    Make more noise (enables debugging).
+    Make more noise verbose infomation.
+
+  -D, --debug
+
+    Enable debugging mode.
 
   -q, --quiet
 
@@ -78,9 +82,9 @@ def main():
     actions = []
     context = Context()
     try:
-        options, arguments = getopt.getopt(sys.argv[1:], 'gce:t:dvqh', [
+        options, arguments = getopt.getopt(sys.argv[1:], 'gce:t:dvqhD', [
             'list-guests', 'list-commands', 'execute=', 'timeout=', 'daemon',
-            'verbose', 'quiet', 'help'
+            'verbose', 'quiet', 'help', 'debug'
         ])
         for option, value in options:
             if option in ('-g', '--list-guests'):
@@ -101,6 +105,8 @@ def main():
                 coloredlogs.increase_verbosity()
             elif option in ('-q', '--quiet'):
                 coloredlogs.decrease_verbosity()
+            elif option in ('-D', '--debug'):
+                coloredlogs.set_level(level='DEBUG')
             elif option in ('-h', '--help'):
                 usage()
                 sys.exit(0)
